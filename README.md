@@ -1,1 +1,1 @@
-# lib3dtilespc
+# py3dtiles
