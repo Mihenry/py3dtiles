@@ -2,5 +2,4 @@
 
 __version__ = '0.0.1'
 
-from .pc import PCReader
-from .feature import Schema, Dimension
+from .utils import TileReader
