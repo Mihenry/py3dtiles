@@ -7,37 +7,58 @@ import numpy as np
 
 class Feature(object):
 
-    def __init__(self, semantic, positions, colors):
+    def __init__(self):
+        self.positions = {}
+        self.colors = {}
+
+    def to_array(self):
+        pos_arr = np.array([(self.positions['X'], self.positions['Y'],
+                            self.positions['Z'])]).view(np.uint8)[0]
+        col_arr = np.array([(self.colors['Red'], self.colors['Green'],
+                            self.colors['Blue'])]).view(np.uint8)[0]
+        return [pos_arr, col_arr]
+
+    @staticmethod
+    def from_array(positions_dtype, positions, colors_dtype, colors):
         """
         Parameters
         ----------
-        semantic : Semantics
+        positions_dtype : numpy.dtype
 
         positions : numpy.array
+            Array of uint8.
+
+        colors_dtype : numpy.dtype
 
         colors : numpy.array
+            Array of uint8.
+
+        Returns
+        -------
+        f : Feature
         """
 
+        f = Feature()
+
         # extract positions
-        self.positions = {}
-        dtype = semantic.positions_dtype
+        f.positions = {}
         off = 0
-        for d in dtype.names:
-            itemsize = dtype[d].itemsize
-            data = np.array(positions[off:off+itemsize]).view(dtype[d])[0]
-            off += itemsize
-            self.positions[d] = data
+        for d in positions_dtype.names:
+            dt = positions_dtype[d]
+            data = np.array(positions[off:off+dt.itemsize]).view(dt)[0]
+            off += dt.itemsize
+            f.positions[d] = data
 
         # extract colors
-        self.colors = {}
-        if semantic.colors != SemanticPoint.NONE:
-            dtype = semantic.colors_dtype
-            off = 0
-            for d in dtype.names:
-                itemsize = dtype[d].itemsize
-                data = np.array(colors[off:off+itemsize]).view(dtype[d])[0]
-                off += itemsize
-                self.colors[d] = data
+        f.colors = {}
+        off = 0
+        for d in colors_dtype.names:
+            dt = colors_dtype[d]
+            data = np.array(colors[off:off+dt.itemsize]).view(dt)[0]
+            off += dt.itemsize
+            f.colors[d] = data
+
+        return f
 
 
 class SemanticPoint(Enum):
@@ -70,8 +91,95 @@ class FeatureTableHeader(object):
         self.normal_dtype = None
 
         # global semantics
-        self.points_length = None
+        self.points_length = 0
         self.rtc = None
+
+    def to_array(self):
+        jsond = self.to_json()
+        json_str = json.dumps(jsond).replace(" ", "")
+        json_str += ' '
+        return np.fromstring(json_str, dtype=np.uint8)
+
+    def to_json(self):
+        jsond = {}
+
+        # length
+        jsond['POINTS_LENGTH'] = self.points_length
+
+        # rtc
+        if self.rtc:
+            jsond['RTC_CENTER'] = self.rtc
+
+        # positions
+        offset = {'byteOffset': self.positions_offset}
+        if self.positions == SemanticPoint.POSITION:
+            jsond['POSITION'] = offset
+        elif self.positions == SemanticPoint.POSITION_QUANTIZED:
+            jsond['POSITION_QUANTIZED'] = offset
+
+        # colors
+        offset = {'byteOffset': self.colors_offset}
+        if self.colors == SemanticPoint.RGB:
+            jsond['RGB'] = offset
+
+        return jsond
+
+    @staticmethod
+    def from_dtype(positions_dtype, colors_dtype, npoints):
+        """
+        Parameters
+        ----------
+        positions_dtype : numpy.dtype
+            Numpy description of a positions.
+
+        colors_dtype : numpy.dtype
+            Numpy description of a colors.
+
+        Returns
+        -------
+        fth : FeatureTableHeader
+        """
+
+        fth = FeatureTableHeader()
+        fth.points_length = npoints
+
+        # search positions
+        names = positions_dtype.names
+        if ('X' in names) and ('Y' in names) and ('Z' in names):
+            dtx = positions_dtype['X']
+            dty = positions_dtype['Y']
+            dtz = positions_dtype['Z']
+            fth.positions_offset = 0
+            if (dtx == np.float32 and dty == np.float32 and dtz == np.float32):
+                fth.positions = SemanticPoint.POSITION
+                fth.positions_dtype = np.dtype([('X', np.float32),
+                                                ('Y', np.float32),
+                                                ('Z', np.float32)])
+            elif (dtx == np.uint16 and dty == np.uint16 and dtz == np.uint16):
+                fth.positions = SemanticPoint.POSITION_QUANTIZED
+                fth.positions_dtype = np.dtype([('X', np.uint16),
+                                                ('Y', np.uint16),
+                                                ('Z', np.uint16)])
+
+        # search colors
+        names = colors_dtype.names
+        if ('Red' in names) and ('Green' in names) and ('Blue' in names):
+            if 'Alpha' in names:
+                fth.colors = SemanticPoint.RGBA
+                fth.colors_dtype = np.dtype([('Red', np.uint8),
+                                             ('Green', np.uint8),
+                                             ('Blue', np.uint8),
+                                             ('Alpha', np.uint8)])
+            else:
+                fth.colors = SemanticPoint.RGB
+                fth.colors_dtype = np.dtype([('Red', np.uint8),
+                                             ('Green', np.uint8),
+                                             ('Blue', np.uint8)])
+
+            fth.colors_offset = (fth.positions_offset
+                                 + npoints*fth.positions_dtype.itemsize)
+
+        return fth
 
     @staticmethod
     def from_array(array):
@@ -88,7 +196,6 @@ class FeatureTableHeader(object):
         """
 
         jsond = json.loads(array.tostring().decode('utf-8'))
-
         fth = FeatureTableHeader()
 
         # search position
@@ -126,8 +233,8 @@ class FeatureTableHeader(object):
             fth.points_length = jsond["POINTS_LENGTH"]
 
         # RTC (Relative To Center)
-        if "RTC" in jsond:
-            fth.rtc = jsond['RTC']
+        if "RTC_CENTER" in jsond:
+            fth.rtc = jsond['RTC_CENTER']
         else:
             fth.rtc = None
 
@@ -142,6 +249,28 @@ class FeatureTableBody(object):
 
         self.colors_arr = []
         self.colors_itemsize = 0
+
+    def to_array(self):
+        return np.concatenate((self.positions_arr, self.colors_arr))
+
+    @staticmethod
+    def from_features(fth, features):
+
+        b = FeatureTableBody()
+
+        # extract positions
+        b.positions_itemsize = fth.positions_dtype.itemsize
+        b.positions_arr = np.array([], dtype=np.uint8)
+
+        b.colors_itemsize = fth.colors_dtype.itemsize
+        b.colors_arr = np.array([], dtype=np.uint8)
+
+        for f in features:
+            fpos, fcol = f.to_array()
+            b.positions_arr = np.concatenate((b.positions_arr, fpos))
+            b.colors_arr = np.concatenate((b.colors_arr, fcol))
+
+        return b
 
     @staticmethod
     def from_array(fth, array):
@@ -196,6 +325,11 @@ class FeatureTable(object):
     def npoints(self):
         return self.header.points_length
 
+    def to_array(self):
+        fth_arr = self.header.to_array()
+        ftb_arr = self.body.to_array()
+        return np.concatenate((fth_arr, ftb_arr))
+
     @staticmethod
     def from_array(th, array):
         """
@@ -227,7 +361,33 @@ class FeatureTable(object):
 
         return ft
 
+    @staticmethod
+    def from_features(pdtype, cdtype, features):
+        """
+        pdtype : numpy.dtype
+            Numpy description for positions.
+
+        cdtype : numpy.dtype
+            Numpy description for colors.
+
+        features : Feature[]
+
+        Returns
+        -------
+        ft : FeatureTable
+        """
+
+        fth = FeatureTableHeader.from_dtype(pdtype, cdtype, len(features))
+        ftb = FeatureTableBody.from_features(fth, features)
+
+        ft = FeatureTable()
+        ft.header = fth
+        ft.body = ftb
+
+        return ft
+
     def feature(self, n):
         pos = self.body.positions(n)
         col = self.body.colors(n)
-        return Feature(self.header, pos, col)
+        return Feature.from_array(self.header.positions_dtype, pos,
+                                  self.header.colors_dtype, col)

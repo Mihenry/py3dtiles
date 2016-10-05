@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import struct
+import numpy as np
 from enum import Enum
 
-from .feature_table import FeatureTable
+from .feature_table import FeatureTable, FeatureTableHeader, FeatureTableBody
 
 
 class Tile(object):
@@ -11,6 +12,63 @@ class Tile(object):
     def __init__(self):
         self.header = TileHeader()
         self.body = TileBody()
+
+    def to_array(self):
+        self.sync()
+        header_arr = self.header.to_array()
+        body_arr = self.body.to_array()
+        return np.concatenate((header_arr, body_arr))
+
+    def to_hex_str(self):
+        arr = self.to_array()
+        return " ".join("{:02X}".format(x) for x in arr)
+
+    def save_as(self, filename):
+        tile_arr = self.to_array()
+        f = open(filename, 'bw')
+        f.write(bytes(tile_arr))
+        f.close()
+
+    def sync(self):
+        """
+        Allow to synchronize headers with contents.
+        """
+
+        # extract array
+        fth_arr = self.body.feature_table.header.to_array()
+        ftb_arr = self.body.feature_table.body.to_array()
+
+        # sync the tile header with feature table contents
+        self.header.magic_value = "pnts"
+        self.header.tile_byte_length = len(fth_arr) + len(ftb_arr) + TileHeader.BYTELENGTH
+        self.header.ft_json_byte_length = len(fth_arr)
+        self.header.ft_bin_byte_length = len(ftb_arr)
+
+    @staticmethod
+    def from_features(pdtype, cdtype, features):
+        """
+        dtype : numpy.dtype
+            Numpy description of a single feature
+
+        features : Feature[]
+
+        Returns
+        -------
+        tile : Tile
+        """
+
+        ft = FeatureTable.from_features(pdtype, cdtype, features)
+
+        tb = TileBody()
+        tb.feature_table = ft
+
+        th = TileHeader()
+
+        t = Tile()
+        t.body = tb
+        t.header = th
+
+        return t
 
     @staticmethod
     def from_array(array):
@@ -64,6 +122,18 @@ class TileHeader(object):
         self.bt_json_byte_length = 0
         self.bt_bin_byte_length = 0
 
+    def to_array(self):
+        header_arr = np.fromstring(self.magic_value, np.uint8)
+
+        header_arr2 = np.array([self.version,
+                                self.tile_byte_length,
+                                self.ft_json_byte_length,
+                                self.ft_bin_byte_length,
+                                self.bt_json_byte_length,
+                                self.bt_bin_byte_length], dtype=np.uint32)
+
+        return np.concatenate((header_arr, header_arr2.view(np.uint8)))
+
     @staticmethod
     def from_array(array):
         """
@@ -100,6 +170,9 @@ class TileBody(object):
     def __init__(self):
         self.feature_table = FeatureTable()
         # TODO : self.batch_table = BatchTable()
+
+    def to_array(self):
+        return self.feature_table.to_array()
 
     @staticmethod
     def from_array(th, array):
