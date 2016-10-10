@@ -2,5 +2,6 @@
 
 __version__ = '0.0.1'
 
-from .utils import TileReader, Tile
+from .utils import TileReader, convert_to_ecef
+from .tile import Tile
 from .feature_table import Feature

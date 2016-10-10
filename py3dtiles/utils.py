@@ -2,6 +2,24 @@
 
 import numpy as np
 from .tile import Tile
+from osgeo import osr, ogr
+
+
+def convert_to_ecef(x, y, z, epsg_input):
+    # init spatial converter
+    inSpatialRef = osr.SpatialReference()
+    inSpatialRef.ImportFromEPSG(epsg_input)
+
+    outSpatialRef = osr.SpatialReference()
+    outSpatialRef.ImportFromEPSG(4978)  # ECEF
+
+    coordTrans = osr.CoordinateTransformation(inSpatialRef, outSpatialRef)
+
+    wkt = "POINT ({0} {1} {2})".format(x, y, z)
+    point = ogr.CreateGeometryFromWkt(wkt)
+    point.Transform(coordTrans)
+
+    return [point.GetX(), point.GetY(), point.GetZ()]
 
 
 class TileReader(object):

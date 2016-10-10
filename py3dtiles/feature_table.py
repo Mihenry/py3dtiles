@@ -14,12 +14,30 @@ class Feature(object):
     def to_array(self):
         pos_arr = np.array([(self.positions['X'], self.positions['Y'],
                             self.positions['Z'])]).view(np.uint8)[0]
-        col_arr = np.array([(self.colors['Red'], self.colors['Green'],
-                            self.colors['Blue'])]).view(np.uint8)[0]
+
+        if len(self.colors):
+            col_arr = np.array([(self.colors['Red'], self.colors['Green'],
+                                self.colors['Blue'])]).view(np.uint8)[0]
+        else:
+            col_arr = np.array([])
+
         return [pos_arr, col_arr]
 
     @staticmethod
-    def from_array(positions_dtype, positions, colors_dtype, colors):
+    def from_values(x, y, z, red=None, green=None, blue=None):
+        f = Feature()
+
+        f.positions = {'X': x, 'Y': y, 'Z': z}
+
+        if red or green or blue:
+            f.colors = {'Red': red, 'Green': green, 'Blue': blue}
+        else:
+            f.colors = {}
+
+        return f
+
+    @staticmethod
+    def from_array(positions_dtype, positions, colors_dtype=None, colors=None):
         """
         Parameters
         ----------
@@ -51,12 +69,13 @@ class Feature(object):
 
         # extract colors
         f.colors = {}
-        off = 0
-        for d in colors_dtype.names:
-            dt = colors_dtype[d]
-            data = np.array(colors[off:off+dt.itemsize]).view(dt)[0]
-            off += dt.itemsize
-            f.colors[d] = data
+        if colors_dtype is not None:
+            off = 0
+            for d in colors_dtype.names:
+                dt = colors_dtype[d]
+                data = np.array(colors[off:off+dt.itemsize]).view(dt)[0]
+                off += dt.itemsize
+                f.colors[d] = data
 
         return f
 
@@ -97,7 +116,9 @@ class FeatureTableHeader(object):
     def to_array(self):
         jsond = self.to_json()
         json_str = json.dumps(jsond).replace(" ", "")
-        json_str += ' '
+
+        json_str += ' '*(len(json_str) % 4)
+
         return np.fromstring(json_str, dtype=np.uint8)
 
     def to_json(self):
@@ -162,22 +183,26 @@ class FeatureTableHeader(object):
                                                 ('Z', np.uint16)])
 
         # search colors
-        names = colors_dtype.names
-        if ('Red' in names) and ('Green' in names) and ('Blue' in names):
-            if 'Alpha' in names:
-                fth.colors = SemanticPoint.RGBA
-                fth.colors_dtype = np.dtype([('Red', np.uint8),
-                                             ('Green', np.uint8),
-                                             ('Blue', np.uint8),
-                                             ('Alpha', np.uint8)])
-            else:
-                fth.colors = SemanticPoint.RGB
-                fth.colors_dtype = np.dtype([('Red', np.uint8),
-                                             ('Green', np.uint8),
-                                             ('Blue', np.uint8)])
+        if colors_dtype is not None:
+            names = colors_dtype.names
+            if ('Red' in names) and ('Green' in names) and ('Blue' in names):
+                if 'Alpha' in names:
+                    fth.colors = SemanticPoint.RGBA
+                    fth.colors_dtype = np.dtype([('Red', np.uint8),
+                                                 ('Green', np.uint8),
+                                                 ('Blue', np.uint8),
+                                                 ('Alpha', np.uint8)])
+                else:
+                    fth.colors = SemanticPoint.RGB
+                    fth.colors_dtype = np.dtype([('Red', np.uint8),
+                                                 ('Green', np.uint8),
+                                                 ('Blue', np.uint8)])
 
-            fth.colors_offset = (fth.positions_offset
-                                 + npoints*fth.positions_dtype.itemsize)
+                fth.colors_offset = (fth.positions_offset
+                                     + npoints*fth.positions_dtype.itemsize)
+        else:
+            fth.colors = SemanticPoint.NONE
+            fth.colors_dtype = None
 
         return fth
 
@@ -251,7 +276,10 @@ class FeatureTableBody(object):
         self.colors_itemsize = 0
 
     def to_array(self):
-        return np.concatenate((self.positions_arr, self.colors_arr))
+        arr = self.positions_arr
+        if len(self.colors_arr):
+            arr = np.concatenate((self.positions_arr, self.colors_arr))
+        return arr
 
     @staticmethod
     def from_features(fth, features):
@@ -262,13 +290,15 @@ class FeatureTableBody(object):
         b.positions_itemsize = fth.positions_dtype.itemsize
         b.positions_arr = np.array([], dtype=np.uint8)
 
-        b.colors_itemsize = fth.colors_dtype.itemsize
-        b.colors_arr = np.array([], dtype=np.uint8)
+        if fth.colors_dtype is not None:
+            b.colors_itemsize = fth.colors_dtype.itemsize
+            b.colors_arr = np.array([], dtype=np.uint8)
 
         for f in features:
             fpos, fcol = f.to_array()
             b.positions_arr = np.concatenate((b.positions_arr, fpos))
-            b.colors_arr = np.concatenate((b.colors_arr, fcol))
+            if fth.colors_dtype is not None:
+                b.colors_arr = np.concatenate((b.colors_arr, fcol))
 
         return b
 

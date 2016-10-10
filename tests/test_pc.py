@@ -27,6 +27,46 @@ class TestTileReader(unittest.TestCase):
 
 class TestTileBuilder(unittest.TestCase):
 
+    def test_build_without_colors(self):
+        tread = TileReader().read_file('tests/pointCloudRGB.pnts')
+        f0_ref = tread.body.feature_table.feature(0).positions
+
+        # numpy dtype for positions and colors
+        pdt = np.dtype([('X', '<f4'), ('Y', '<f4'), ('Z', '<f4')])
+
+        # create features
+        features = []
+        for i in range(0, tread.body.feature_table.header.points_length):
+            f = tread.body.feature_table.feature(i)
+            p = f.positions
+            pos = np.array([(p['X'], p['Y'], p['Z'])], dtype=pdt).view('uint8')
+            newf = Feature.from_array(pdt, pos)
+            features.append(newf)
+
+        # create a tile
+        t = Tile.from_features(pdt, None, features)
+
+        # configure the tile
+        rtc = [1215012.8828876738, -4736313.051199594, 4081605.22126042]
+        t.body.feature_table.header.rtc = rtc
+
+        # get an array
+        tile_arr = t.to_array()
+        t2 = Tile.from_array(tile_arr)
+        self.assertEqual(t2.header.version, 1.0)
+        self.assertEqual(t2.header.tile_byte_length, 12148)
+        self.assertEqual(t2.header.ft_json_byte_length, 120)
+        self.assertEqual(t2.header.ft_bin_byte_length, 12000)
+        self.assertEqual(t2.header.bt_json_byte_length, 0)
+        self.assertEqual(t2.header.bt_bin_byte_length, 0)
+
+        feature_table = t.body.feature_table
+        f0 = feature_table.feature(0).positions
+
+        self.assertAlmostEqual(f0_ref['X'], f0['X'])
+        self.assertAlmostEqual(f0_ref['Y'], f0['Y'])
+        self.assertAlmostEqual(f0_ref['Z'], f0['Z'])
+
     def test_build(self):
         tread = TileReader().read_file('tests/pointCloudRGB.pnts')
 
@@ -56,8 +96,8 @@ class TestTileBuilder(unittest.TestCase):
         tile_arr = t.to_array()
         t2 = Tile.from_array(tile_arr)
         self.assertEqual(t2.header.version, 1.0)
-        self.assertEqual(t2.header.tile_byte_length, 15176)
-        self.assertEqual(t2.header.ft_json_byte_length, 148)
+        self.assertEqual(t2.header.tile_byte_length, 15178)
+        self.assertEqual(t2.header.ft_json_byte_length, 150)
         self.assertEqual(t2.header.ft_bin_byte_length, 15000)
         self.assertEqual(t2.header.bt_json_byte_length, 0)
         self.assertEqual(t2.header.bt_bin_byte_length, 0)
@@ -66,6 +106,8 @@ class TestTileBuilder(unittest.TestCase):
         feature = feature_table.feature(0)
         dcol_res = {'Red': 44, 'Blue': 209, 'Green': 243}
         self.assertDictEqual(dcol_res, feature.colors)
+
+        # t2.save_as("/tmp/py3dtiles_test_build_1.pnts")
 
 def test_suite():
     return unittest.TestSuite([TestTileReader, TestTileBuilder])
