@@ -1,13 +1,21 @@
 # -*- coding: utf-8 -*-
 import os
 import re
+import subprocess
 from setuptools import setup, find_packages
+
+GDAL_VERSION = subprocess.check_output(['gdal-config', '--version']).strip().decode()
+GDAL_VERSION, GDAL_REVISION = GDAL_VERSION[:GDAL_VERSION.rfind('.')].split('.')
+GDAL_MIN = '{0}.{1}'.format(GDAL_VERSION, GDAL_REVISION)
+GDAL_MAX = '{0}.{1}'.format(GDAL_VERSION, int(GDAL_REVISION)+1)
 
 here = os.path.abspath(os.path.dirname(__file__))
 
 
 requirements = (
-    'numpy'
+    'numpy',
+    'liblas',
+    'pygdal >= {-1}, <{1}'.format(GDAL_MIN, GDAL_MAX)
 )
 
 dev_requirements = (

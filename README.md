@@ -12,6 +12,7 @@ For now, only the Point Cloud specification is supported.
 To use py3dtiles from sources:
 
 ````
+$ sudo apt-get install libgdal-dev
 $ git clone https://github.com/pblottiere/py3dtiles
 $ cd py3dtiles
 $ virtualenv -p /usr/bin/python3 venv
@@ -45,7 +46,9 @@ The py3dtiles module provides some classes to fit into the specification:
 - *FeatureTable* with a header *FeatureTableHeader* and a *FeatureTableBody*
 - *FeatureTableBody* which contains features of type *Feature*
 
-Moreover, a utility class *TileReader* is available to read a *.pnts* file.
+Moreover, a utility class *TileReader* is available to read a *.pnts* file as
+well as simple command line tool to retrieve basic information about a Point Cloud
+file **py3dtiles_info.py**.
 
 
 **How to read a .pnts file**
@@ -91,14 +94,59 @@ Moreover, a utility class *TileReader* is available to read a *.pnts* file.
 {'Green': 243, 'Red': 44, 'Blue': 209}
 ````
 
-To write a Point Cloud file, you have to build a numpy array with the corresponding dtype:
+**How to write a .pnts file**
+
+To write a Point Cloud file, you have to build a numpy array with the
+corresponding data type.
+
+````python
+>>> from py3dtiles import Feature
+>>> import numpy as np
+>>>
+>>> # create the numpy dtype for positions with 32-bit floating point numbers
+>>> dt = np.dtype([('X', '<f4'), ('Y', '<f4'), ('Z', '<f4')])
+>>>
+>>> # create a position array
+>>> position = np.array([(4.489, 2.19, -0.17)], dtype=dt)
+>>>
+>>> # create a new feature from a uint8 numpy array
+>>> f = Feature.from_array(dt, position.view('uint8'))
+>>> f
+<py3dtiles.feature_table.Feature>
+>>> f.positions
+{'Y': 2.19, 'X': 4.489, 'Z': -0.17}
+>>>
+>>> # create a tile directly from our feature. None is for "no colors".
+>>> t  = Tile.from_features(dt, None, [f])
+>>>
+>>> # the tile is complete
+>>> t.body.feature_table.header.to_json()
+{'POINTS_LENGTH': 1, 'POSITION': {'byteOffset': 0}}
+>>>
+>>> # to save our tile as a .pnts file
+>>> t.save_as("mypoints.pnts")
+````
+
+**How to use py3dtiles_info.py**
+
+If we want to retrieve basic information about the file *mypoints.pnts*
+previously created:
 
 ````
-> python3
-# from py3dtiles import TileReader
-TODO
+$ ./tools/py3dtiles_info.py mypoints.pnts
+Tile Header
+-----------
+Magic Value:  pnts
+Version:  1
+Tile byte length:  88
+Feature table json byte length:  48
+Feature table bin byte length:  12
+
+Feature Table Header
+--------------------
+{'POINTS_LENGTH': 1, 'POSITION': {'byteOffset': 0}}
+
+First point
+-----------
+{'Y': 2.1900001, 'X': 4.4889998, 'Z': -0.17}
 ````
-
-
-#### Tools
-

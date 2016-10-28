@@ -1,3 +1,4 @@
+#! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
 import argparse
@@ -37,7 +38,6 @@ def print_info(filename):
         print(d)
 
 if __name__ == '__main__':
-
     # arg parse
     descr = 'Extract informations from a 3DTiles file'
     parser = argparse.ArgumentParser(description=descr)
