@@ -1,3 +1,6 @@
+ [![Build Status](https://secure.travis-ci.org/pblottiere/py3dtiles.png)]
+ (https://travis-ci.org/pblottiere/py3dtiles)
+
 # py3dtiles
 
 Python module to manage 3DTiles format.
