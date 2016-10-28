@@ -1,25 +1,14 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
+import pyproj
 from .tile import Tile
-from osgeo import osr, ogr
 
 
 def convert_to_ecef(x, y, z, epsg_input):
-    # init spatial converter
-    inSpatialRef = osr.SpatialReference()
-    inSpatialRef.ImportFromEPSG(epsg_input)
-
-    outSpatialRef = osr.SpatialReference()
-    outSpatialRef.ImportFromEPSG(4978)  # ECEF
-
-    coordTrans = osr.CoordinateTransformation(inSpatialRef, outSpatialRef)
-
-    wkt = "POINT ({0} {1} {2})".format(x, y, z)
-    point = ogr.CreateGeometryFromWkt(wkt)
-    point.Transform(coordTrans)
-
-    return [point.GetX(), point.GetY(), point.GetZ()]
+    inp = pyproj.Proj(init='epsg:{0}'.format(epsg_input))
+    outp = pyproj.Proj(init='epsg:4978')  # ECEF
+    return pyproj.transform(inp, outp, x, y, z)
 
 
 class TileReader(object):

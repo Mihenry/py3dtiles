@@ -21,6 +21,7 @@ $ cd py3dtiles
 $ virtualenv -p /usr/bin/python3 venv
 $ . venv/bin/activate
 (venv)$ pip install -e
+(venv)$ python setup.py install
 ````
 
 If you wan to run unit tests:
