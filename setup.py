@@ -15,7 +15,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 requirements = (
     'numpy',
     'liblas',
-    'pygdal >= {-1}, <{1}'.format(GDAL_MIN, GDAL_MAX)
+    'pygdal >= {0}, <{1}'.format(GDAL_MIN, GDAL_MAX)
 )
 
 dev_requirements = (
