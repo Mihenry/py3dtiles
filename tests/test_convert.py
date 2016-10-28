@@ -17,10 +17,3 @@ class TestConvert(unittest.TestCase):
         self.assertAlmostEqual(x, 1215626.30684538)
         self.assertAlmostEqual(y, -4738673.45914053)
         self.assertAlmostEqual(z, 4083122.83975827)
-
-
-def test_suite():
-    return unittest.TestSuite([TestConvert])
-
-    if __name__ == '__main__':
-        unittest.main()

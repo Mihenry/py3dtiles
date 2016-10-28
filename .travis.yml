@@ -1,0 +1,15 @@
+sudo: required
+dist: trusty
+
+language: python
+python:
+  - "3.5"
+
+before_install:
+  - sudo apt-get install libgdal-dev
+
+install:
+  - pip install --upgrade pip
+  - pip install -e .
+
+script: nosetests

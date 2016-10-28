@@ -108,9 +108,3 @@ class TestTileBuilder(unittest.TestCase):
         self.assertDictEqual(dcol_res, feature.colors)
 
         # t2.save_as("/tmp/py3dtiles_test_build_1.pnts")
-
-def test_suite():
-    return unittest.TestSuite([TestTileReader, TestTileBuilder])
-
-    if __name__ == '__main__':
-        unittest.main()
