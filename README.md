@@ -11,7 +11,7 @@ For now, only the Point Cloud specification is supported.
 
 To use py3dtiles from sources:
 
-````bash
+````
 $ git clone https://github.com/pblottiere/py3dtiles
 $ cd py3dtiles
 $ virtualenv -p /usr/bin/python3 venv
@@ -47,6 +47,9 @@ The py3dtiles module provides some classes to fit into the specification:
 
 Moreover, a utility class *TileReader* is available to read a *.pnts* file.
 
+
+**How to read a .pnts file**
+
 ````python
 >>> from py3dtiles import TileReader
 >>>
@@ -78,6 +81,14 @@ Moreover, a utility class *TileReader* is available to read a *.pnts* file.
 {'RTC_CENTER': [1215012.8828876738, -4736313.051199594, 4081605.22126042],
 'RGB': {'byteOffset': 12000}, 'POINTS_LENGTH': 1000, 'POSITION': {'byteOffset': 0}}
 >>>
+>>> # extract positions and colors of the first point
+>>> f = ft.feature(0)
+>>> f
+<py3dtiles.feature_table.Feature>
+>>> f.positions
+{'Y': 4.4896851, 'X': 2.19396, 'Z': -0.17107764}
+>>> f.colors
+{'Green': 243, 'Red': 44, 'Blue': 209}
 ````
 
 To write a Point Cloud file, you have to build a numpy array with the corresponding dtype:
