@@ -15,7 +15,6 @@ For now, only the Point Cloud specification is supported.
 To use py3dtiles from sources:
 
 ````
-$ sudo apt-get install libgdal-dev
 $ git clone https://github.com/pblottiere/py3dtiles
 $ cd py3dtiles
 $ virtualenv -p /usr/bin/python3 venv
